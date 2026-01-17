@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Lock</title>
+
+<!-- Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+<!-- MQTT -->
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<style>
+body{
+  background:#0f172a;
+  font-family:Inter;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  margin:0;
+  color:#e5e7eb;
+}
+.card{
+  background:#020617;
+  width:320px;
+  padding:25px;
+  border-radius:18px;
+  text-align:center;
+}
+h1{
+  letter-spacing:4px;
+}
+.status{
+  margin:10px 0 20px;
+  font-size:14px;
+  color:#94a3b8;
+}
+.dots{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:18px;
+}
+.dot{
+  width:14px;
+  height:14px;
+  background:#334155;
+  border-radius:50%;
+}
+.dot.active{
+  background:#22c55e;
+  box-shadow:0 0 8px #22c55e;
+}
+.keypad{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+button{
+  height:46px;
+  border:none;
+  border-radius:12px;
+  font-size:18px;
+  background:#1e293b;
+  color:white;
+  cursor:pointer;
+}
+button:active{
+  background:#22c55e;
+  color:black;
+}
+.action{
+  margin-top:15px;
+  width:100%;
+  background:#22c55e;
+  color:black;
+  font-weight:700;
+}
+.error{
+  color:#ef4444;
+  margin-top:10px;
+  min-height:18px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <h1>SMART LOCK</h1>
+  <div id="status" class="status">LOCKED</div>
+
+  <div class="dots" id="dots"></div>
+
+  <div class="keypad">
+    <button onclick="press('1')">1</button>
+    <button onclick="press('2')">2</button>
+    <button onclick="press('3')">3</button>
+    <button onclick="press('4')">4</button>
+    <button onclick="press('5')">5</button>
+    <button onclick="press('6')">6</button>
+    <button onclick="press('7')">7</button>
+    <button onclick="press('8')">8</button>
+    <button onclick="press('9')">9</button>
+    <button onclick="clearAll()">C</button>
+    <button onclick="press('0')">0</button>
+    <button onclick="del()">⌫</button>
+  </div>
+
+  <button class="action" onclick="submit()">LOCK / UNLOCK</button>
+  <div id="error" class="error"></div>
+</div>
+
+<script>
+const PASSWORD = "1234";
+
+const CMD_TOPIC = "door/lock/omkar/cmd";
+const STATUS_TOPIC = "door/lock/omkar/status";
+
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+
+let input = "";
+let locked = true;
+
+const dots = document.getElementById("dots");
+const statusText = document.getElementById("status");
+const error = document.getElementById("error");
+
+function drawDots(){
+  dots.innerHTML="";
+  for(let i=0;i<4;i++){
+    const d=document.createElement("div");
+    d.className="dot"+(i<input.length?" active":"");
+    dots.appendChild(d);
+  }
+}
+
+function press(n){
+  if(input.length<4) input+=n;
+  drawDots();
+}
+function clearAll(){ input=""; drawDots(); }
+function del(){ input=input.slice(0,-1); drawDots(); }
+
+function submit(){
+  if(input!==PASSWORD){
+    error.textContent="Wrong Password";
+    clearAll();
+    return;
+  }
+  error.textContent="";
+  client.publish(CMD_TOPIC, locked ? "OFF" : "ON");
+  clearAll();
+}
+
+// ---------- MQTT ----------
+client.on("connect",()=>{
+  console.log("MQTT Connected");
+  client.subscribe(STATUS_TOPIC);
+});
+
+client.on("message",(topic,message)=>{
+  if(topic===STATUS_TOPIC){
+    locked = message.toString()==="ON";
+    statusText.textContent = locked ? "LOCKED" : "UNLOCKED";
+  }
+});
+
+drawDots();
+</script>
+
+</body>
+</html>
